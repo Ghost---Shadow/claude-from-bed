@@ -182,8 +182,7 @@ app.post('/hooks/post-tool-use-failure', (req, res) => {
     summary,
     error: error_message || 'Unknown error',
     tool_use_id,
-    session_id,
-    notify: true
+    session_id
   });
 
   activeTools.delete(tool_use_id);
@@ -199,8 +198,7 @@ app.post('/hooks/notification', (req, res) => {
   const evt = createEvent('notification', {
     message: message || title || 'Claude needs attention',
     notification_type,
-    session_id,
-    notify: true
+    session_id
   });
 
   broadcast(evt);
@@ -241,7 +239,7 @@ app.post('/hooks/stop', (req, res) => {
     });
   } else {
     // Let Claude stop normally
-    const evt = createEvent('claude_stopped', { session_id });
+    const evt = createEvent('claude_stopped', { session_id, notify: true });
     broadcast(evt);
     console.log('[stop] Claude stopped (no pending messages)');
     res.json({});
@@ -256,8 +254,7 @@ app.post('/hooks/session-start', (req, res) => {
 
   const evt = createEvent('session_start', {
     session_id,
-    source: source || 'startup',
-    notify: true
+    source: source || 'startup'
   });
 
   broadcast(evt);
