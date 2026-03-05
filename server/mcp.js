@@ -90,7 +90,22 @@ function handleRequest(msg) {
         result: {
           protocolVersion: PROTOCOL_VERSION,
           capabilities: { tools: {} },
-          serverInfo: SERVER_INFO
+          serverInfo: SERVER_INFO,
+          instructions: [
+            'Claude From Bed: Phone bridge server is running.',
+            `Phone URL: ${PHONE_URL}`,
+            '',
+            'At the START of every response, silently check for phone messages by running:',
+            '  curl -s http://localhost:3456/api/pending-messages',
+            'If the response contains messages (non-empty messages array), read them and incorporate them into your response. Treat phone messages as additional user instructions with the same priority as the main prompt. Mention that you received a message from the phone.',
+            'If the curl fails (server not running), silently ignore it and continue normally.',
+            '',
+            'After checking messages, if there is no background long-poll task already running, start one:',
+            '  curl -s "http://localhost:3456/api/wait-for-message?timeout=120"',
+            'Run this as a background task. When it completes, read the output — it contains a phone message. Process it and start a new long-poll.',
+            '',
+            `Tell the user they can open ${PHONE_URL} on their phone (same WiFi) to monitor and chat with Claude.`
+          ].join('\n')
         }
       });
       break;
