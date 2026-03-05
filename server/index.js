@@ -36,16 +36,30 @@ wss.on('connection', (ws) => {
     try {
       const msg = JSON.parse(raw);
       if (msg.type === 'message' && msg.text) {
-        pendingMessages.push({
-          text: msg.text,
-          timestamp: Date.now()
-        });
+        const phoneMsg = { text: msg.text, timestamp: Date.now() };
+        pendingMessages.push(phoneMsg);
         const evt = createEvent('phone_message', {
           text: msg.text,
           status: 'queued'
         });
         broadcast(evt);
         console.log(`[phone] Message queued: "${msg.text.substring(0, 80)}..."`);
+
+        // Wake up any long-poll clients waiting for messages
+        if (waitingClients.length > 0) {
+          const messages = pendingMessages.splice(0);
+          const deliveredEvt = createEvent('phone_message_delivered', { count: messages.length });
+          broadcast(deliveredEvt);
+          const payload = { messages: messages.map(m => ({ text: m.text, timestamp: m.timestamp })) };
+          waitingClients.forEach(c => {
+            if (!c.resolved) {
+              c.resolved = true;
+              c.res.json(payload);
+            }
+          });
+          waitingClients = [];
+          console.log(`[wait] Delivered ${messages.length} message(s) to long-poll client`);
+        }
       }
     } catch (e) {
       // ignore malformed messages
@@ -270,6 +284,42 @@ app.get('/api/pending-messages', (req, res) => {
   broadcast(deliveredEvt);
   console.log(`[api] Delivered ${messages.length} phone message(s) to Claude`);
   res.json({ messages: messages.map(m => ({ text: m.text, timestamp: m.timestamp })) });
+});
+
+// Long-poll: blocks until a phone message arrives, then returns it
+// Used as a background task so Claude gets notified when a message comes in
+let waitingClients = [];
+
+app.get('/api/wait-for-message', (req, res) => {
+  const timeout = Math.min(parseInt(req.query.timeout) || 120, 300) * 1000; // default 120s, max 300s
+
+  // If there are already pending messages, return immediately
+  if (pendingMessages.length > 0) {
+    const messages = pendingMessages.splice(0);
+    const deliveredEvt = createEvent('phone_message_delivered', { count: messages.length });
+    broadcast(deliveredEvt);
+    console.log(`[wait] Delivered ${messages.length} phone message(s) immediately`);
+    res.json({ messages: messages.map(m => ({ text: m.text, timestamp: m.timestamp })) });
+    return;
+  }
+
+  // Otherwise, wait for a message to arrive
+  const client = { res, resolved: false };
+  waitingClients.push(client);
+
+  const timer = setTimeout(() => {
+    if (!client.resolved) {
+      client.resolved = true;
+      waitingClients = waitingClients.filter(c => c !== client);
+      res.json({ messages: [], timeout: true });
+    }
+  }, timeout);
+
+  req.on('close', () => {
+    clearTimeout(timer);
+    client.resolved = true;
+    waitingClients = waitingClients.filter(c => c !== client);
+  });
 });
 
 app.get('/api/status', (req, res) => {
