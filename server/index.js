@@ -150,7 +150,21 @@ app.post('/hooks/pre-tool-use', (req, res) => {
   if (tool_use_id) activeTools.set(tool_use_id, evt);
   broadcast(evt);
   console.log(`[hook] ${tool_name}: ${summary.substring(0, 80)}`);
-  res.json({});
+
+  // Deliver pending phone messages before the next tool runs
+  if (pendingMessages.length > 0) {
+    const messages = pendingMessages.splice(0);
+    const combined = messages.map(m => m.text).join('\n\n');
+    const deliveredEvt = createEvent('phone_message_delivered', { count: messages.length });
+    broadcast(deliveredEvt);
+    console.log(`[pre-tool] Injecting ${messages.length} phone message(s) into Claude`);
+    res.json({
+      decision: 'block',
+      reason: `[Message from user via phone]:\n${combined}`
+    });
+  } else {
+    res.json({});
+  }
 });
 
 // PostToolUse - log result (async hook)
@@ -342,14 +356,28 @@ function getLanIP() {
   return 'localhost';
 }
 
+function tryKillPort(port) {
+  return new Promise((resolve) => {
+    const { exec } = require('child_process');
+    const cmd = process.platform === 'win32'
+      ? `for /f "tokens=5" %a in ('netstat -ano ^| findstr :${port} ^| findstr LISTENING') do taskkill /F /PID %a`
+      : `lsof -ti:${port} | xargs kill -9 2>/dev/null`;
+    exec(cmd, { shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/sh' }, (err) => {
+      // Resolve regardless — best effort
+      setTimeout(resolve, 1000);
+    });
+  });
+}
+
 function startServer() {
   const lanIP = getLanIP();
   const url = `http://${lanIP}:${PORT}`;
 
-  server.on('error', (err) => {
+  server.on('error', async (err) => {
     if (err.code === 'EADDRINUSE') {
-      console.log(`  [server] Port ${PORT} already in use — another instance may be running.`);
-      console.log(`  [server] Try: npx kill-port ${PORT}  or change PORT env var`);
+      console.log(`  [server] Port ${PORT} in use — killing old process and retrying...`);
+      await tryKillPort(PORT);
+      server.listen(PORT, '0.0.0.0');
     } else {
       console.log(`  [server] Server error: ${err.message}`);
     }
