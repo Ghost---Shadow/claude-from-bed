@@ -184,12 +184,12 @@ function setupDesktop() {
   if (!config.mcpServers) config.mcpServers = {};
 
   config.mcpServers['claude-from-bed'] = {
-    command: 'node',
-    args: [MCP_SERVER_PATH]
+    command: 'npx',
+    args: ['-y', 'claude-from-bed', 'mcp']
   };
 
   fs.writeFileSync(CLAUDE_DESKTOP_CONFIG_PATH, JSON.stringify(config, null, 2));
-  console.log(`  + Registered MCP server: ${MCP_SERVER_PATH}`);
+  console.log(`  + Registered MCP server: npx -y claude-from-bed mcp`);
   console.log(`  Config: ${CLAUDE_DESKTOP_CONFIG_PATH}`);
   console.log('');
   console.log('  Restart Claude Desktop to activate.');
@@ -223,12 +223,12 @@ function setupMcpCli() {
   if (!settings.mcpServers) settings.mcpServers = {};
 
   settings.mcpServers['claude-from-bed'] = {
-    command: 'node',
-    args: [MCP_SERVER_PATH]
+    command: 'npx',
+    args: ['-y', 'claude-from-bed', 'mcp']
   };
 
   fs.writeFileSync(CLAUDE_SETTINGS_PATH, JSON.stringify(settings, null, 2));
-  console.log(`  + Registered MCP server: ${MCP_SERVER_PATH}`);
+  console.log(`  + Registered MCP server: npx -y claude-from-bed mcp`);
   console.log(`  Config: ${CLAUDE_SETTINGS_PATH}`);
   console.log('');
   console.log('  Start a new Claude Code session to activate.');
@@ -287,6 +287,11 @@ switch (command) {
     uninstallDesktop();
     break;
 
+  case 'mcp':
+    // Start as MCP server (called by Claude Desktop/Code)
+    require(path.join(__dirname, '..', 'server', 'mcp.js'));
+    break;
+
   case 'start':
   case undefined:
     // Start the server
@@ -300,6 +305,7 @@ switch (command) {
     console.log('');
     console.log('  Commands:');
     console.log('    (none)             Start the bridge server standalone');
+    console.log('    mcp                Start as MCP server (used by Claude Desktop)');
     console.log('    setup              Install hooks into Claude Code settings');
     console.log('    setup-desktop      Register MCP server for Claude Desktop');
     console.log('    setup-mcp          Register MCP server for Claude Code CLI');
