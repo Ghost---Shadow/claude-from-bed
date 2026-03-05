@@ -8,49 +8,43 @@ const HOOKS_CONFIG = {
   PreToolUse: [{
     matcher: '',
     hooks: [{
-      type: 'http',
-      url: 'http://localhost:3456/hooks/pre-tool-use',
-      timeout: 5
+      type: 'command',
+      command: 'curl -sf --max-time 5 -X POST -H "Content-Type: application/json" --data @- http://localhost:3456/hooks/pre-tool-use || true'
     }]
   }],
   PostToolUse: [{
     matcher: '',
     hooks: [{
-      type: 'http',
-      url: 'http://localhost:3456/hooks/post-tool-use',
-      timeout: 5
+      type: 'command',
+      command: 'curl -sf --max-time 5 -X POST -H "Content-Type: application/json" --data @- http://localhost:3456/hooks/post-tool-use || true'
     }]
   }],
   PostToolUseFailure: [{
     matcher: '',
     hooks: [{
-      type: 'http',
-      url: 'http://localhost:3456/hooks/post-tool-use-failure',
-      timeout: 5
+      type: 'command',
+      command: 'curl -sf --max-time 5 -X POST -H "Content-Type: application/json" --data @- http://localhost:3456/hooks/post-tool-use-failure || true'
     }]
   }],
   Notification: [{
     matcher: '',
     hooks: [{
-      type: 'http',
-      url: 'http://localhost:3456/hooks/notification',
-      timeout: 5
+      type: 'command',
+      command: 'curl -sf --max-time 5 -X POST -H "Content-Type: application/json" --data @- http://localhost:3456/hooks/notification || true'
     }]
   }],
   Stop: [{
     matcher: '',
     hooks: [{
-      type: 'http',
-      url: 'http://localhost:3456/hooks/stop',
-      timeout: 10
+      type: 'command',
+      command: 'curl -sf --max-time 10 -X POST -H "Content-Type: application/json" --data @- http://localhost:3456/hooks/stop || echo "{}"'
     }]
   }],
   SessionStart: [{
     matcher: '',
     hooks: [{
-      type: 'http',
-      url: 'http://localhost:3456/hooks/session-start',
-      timeout: 5
+      type: 'command',
+      command: 'curl -sf --max-time 5 -X POST -H "Content-Type: application/json" --data @- http://localhost:3456/hooks/session-start || true'
     }]
   }]
 };
@@ -91,10 +85,9 @@ function setup() {
       settings.hooks[event] = [];
     }
 
-    // Check if our hook URL is already present
-    const ourUrl = config[0].hooks[0].url;
+    // Check if our hook is already present
     const alreadyExists = settings.hooks[event].some(entry =>
-      entry.hooks && entry.hooks.some(h => h.url && h.url.includes('localhost:3456'))
+      entry.hooks && entry.hooks.some(h => h.command && h.command.includes('localhost:3456'))
     );
 
     if (!alreadyExists) {
@@ -139,7 +132,7 @@ function uninstall() {
   for (const event of Object.keys(settings.hooks)) {
     const before = settings.hooks[event].length;
     settings.hooks[event] = settings.hooks[event].filter(entry =>
-      !(entry.hooks && entry.hooks.some(h => h.url && h.url.includes('localhost:3456')))
+      !(entry.hooks && entry.hooks.some(h => h.command && h.command.includes('localhost:3456')))
     );
     removed += before - settings.hooks[event].length;
 
