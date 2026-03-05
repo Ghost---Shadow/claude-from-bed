@@ -56,6 +56,11 @@ const HOOKS_CONFIG = {
 };
 
 const CLAUDE_SETTINGS_PATH = path.join(os.homedir(), '.claude', 'settings.json');
+const CLAUDE_DESKTOP_CONFIG_PATH = process.platform === 'win32'
+  ? path.join(process.env.APPDATA || '', 'Claude', 'claude_desktop_config.json')
+  : path.join(os.homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
+
+const MCP_SERVER_PATH = path.resolve(path.join(__dirname, '..', 'server', 'mcp.js'));
 
 function setup() {
   console.log('');
@@ -154,6 +159,110 @@ function uninstall() {
   console.log('');
 }
 
+function setupDesktop() {
+  console.log('');
+  console.log('  Setting up Claude From Bed as MCP server for Claude Desktop...');
+  console.log('');
+
+  // Ensure config directory exists
+  const configDir = path.dirname(CLAUDE_DESKTOP_CONFIG_PATH);
+  if (!fs.existsSync(configDir)) {
+    fs.mkdirSync(configDir, { recursive: true });
+  }
+
+  // Read existing config
+  let config = {};
+  if (fs.existsSync(CLAUDE_DESKTOP_CONFIG_PATH)) {
+    try {
+      config = JSON.parse(fs.readFileSync(CLAUDE_DESKTOP_CONFIG_PATH, 'utf8'));
+    } catch (e) {
+      console.log(`  Warning: Could not parse ${CLAUDE_DESKTOP_CONFIG_PATH}, starting fresh`);
+    }
+  }
+
+  // Add MCP server
+  if (!config.mcpServers) config.mcpServers = {};
+
+  config.mcpServers['claude-from-bed'] = {
+    command: 'node',
+    args: [MCP_SERVER_PATH]
+  };
+
+  fs.writeFileSync(CLAUDE_DESKTOP_CONFIG_PATH, JSON.stringify(config, null, 2));
+  console.log(`  + Registered MCP server: ${MCP_SERVER_PATH}`);
+  console.log(`  Config: ${CLAUDE_DESKTOP_CONFIG_PATH}`);
+  console.log('');
+  console.log('  Restart Claude Desktop to activate.');
+  console.log('  The bridge server will auto-start with each session.');
+  console.log('  Open the URL shown in Claude Desktop logs on your phone.');
+  console.log('');
+}
+
+function setupMcpCli() {
+  console.log('');
+  console.log('  Setting up Claude From Bed as MCP server for Claude Code CLI...');
+  console.log('');
+
+  // Ensure ~/.claude/ exists
+  const claudeDir = path.dirname(CLAUDE_SETTINGS_PATH);
+  if (!fs.existsSync(claudeDir)) {
+    fs.mkdirSync(claudeDir, { recursive: true });
+  }
+
+  // Read existing settings
+  let settings = {};
+  if (fs.existsSync(CLAUDE_SETTINGS_PATH)) {
+    try {
+      settings = JSON.parse(fs.readFileSync(CLAUDE_SETTINGS_PATH, 'utf8'));
+    } catch (e) {
+      console.log(`  Warning: Could not parse ${CLAUDE_SETTINGS_PATH}, starting fresh`);
+    }
+  }
+
+  // Add MCP server
+  if (!settings.mcpServers) settings.mcpServers = {};
+
+  settings.mcpServers['claude-from-bed'] = {
+    command: 'node',
+    args: [MCP_SERVER_PATH]
+  };
+
+  fs.writeFileSync(CLAUDE_SETTINGS_PATH, JSON.stringify(settings, null, 2));
+  console.log(`  + Registered MCP server: ${MCP_SERVER_PATH}`);
+  console.log(`  Config: ${CLAUDE_SETTINGS_PATH}`);
+  console.log('');
+  console.log('  Start a new Claude Code session to activate.');
+  console.log('');
+}
+
+function uninstallDesktop() {
+  console.log('');
+  console.log('  Removing Claude From Bed MCP server from Claude Desktop...');
+
+  if (!fs.existsSync(CLAUDE_DESKTOP_CONFIG_PATH)) {
+    console.log('  No config file found. Nothing to remove.');
+    return;
+  }
+
+  let config = {};
+  try {
+    config = JSON.parse(fs.readFileSync(CLAUDE_DESKTOP_CONFIG_PATH, 'utf8'));
+  } catch (e) {
+    console.log('  Could not parse config file.');
+    return;
+  }
+
+  if (config.mcpServers && config.mcpServers['claude-from-bed']) {
+    delete config.mcpServers['claude-from-bed'];
+    if (Object.keys(config.mcpServers).length === 0) delete config.mcpServers;
+    fs.writeFileSync(CLAUDE_DESKTOP_CONFIG_PATH, JSON.stringify(config, null, 2));
+    console.log('  Removed MCP server entry.');
+  } else {
+    console.log('  MCP server not found in config.');
+  }
+  console.log('');
+}
+
 // ── CLI router ─────────────────────────────────────────────────────────────────
 const command = process.argv[2];
 
@@ -162,8 +271,20 @@ switch (command) {
     setup();
     break;
 
+  case 'setup-desktop':
+    setupDesktop();
+    break;
+
+  case 'setup-mcp':
+    setupMcpCli();
+    break;
+
   case 'uninstall':
     uninstall();
+    break;
+
+  case 'uninstall-desktop':
+    uninstallDesktop();
     break;
 
   case 'start':
@@ -178,9 +299,12 @@ switch (command) {
     console.log('  Usage: claude-from-bed [command]');
     console.log('');
     console.log('  Commands:');
-    console.log('    (none)      Start the bridge server');
-    console.log('    setup       Install hooks into Claude Code settings');
-    console.log('    uninstall   Remove hooks from Claude Code settings');
+    console.log('    (none)             Start the bridge server standalone');
+    console.log('    setup              Install hooks into Claude Code settings');
+    console.log('    setup-desktop      Register MCP server for Claude Desktop');
+    console.log('    setup-mcp          Register MCP server for Claude Code CLI');
+    console.log('    uninstall          Remove hooks from Claude Code settings');
+    console.log('    uninstall-desktop  Remove MCP server from Claude Desktop');
     console.log('');
     break;
 }

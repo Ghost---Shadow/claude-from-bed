@@ -3,23 +3,31 @@
 Monitor and chat with Claude Code from your phone while lying in bed. Runs a local web server on your LAN — no app install needed.
 
 ```
-┌──────────────┐    HTTP hooks    ┌────────────────┐   WebSocket    ┌─────────────┐
+┌──────────────┐   MCP / hooks   ┌────────────────┐   WebSocket    ┌─────────────┐
 │  Claude Code │ ───────────────> │  Bridge Server │ ────────────> │  Phone UI   │
-│  (Terminal)  │ <─────────────── │  (Node.js)     │ <──────────── │  (Browser)  │
+│  (Desktop)   │ <─────────────── │  (Node.js)     │ <──────────── │  (Browser)  │
 └──────────────┘                  └────────────────┘               └─────────────┘
 ```
 
-## Quick Start
+## Quick Start (Claude Desktop)
 
 ```bash
-# 1. Install hooks into Claude Code (one-time)
-npx claude-from-bed setup
+# One-time setup — registers MCP server
+npx claude-from-bed setup-desktop
 
-# 2. Start the bridge server
-npx claude-from-bed
+# Restart Claude Desktop. The bridge server auto-starts with each session.
+# Open the URL shown in logs on your phone (same WiFi).
+```
 
-# 3. Scan the QR code with your phone (or open the URL)
-# 4. Start Claude Code in another terminal — events flow to your phone
+## Quick Start (Claude Code CLI)
+
+```bash
+# Option A: MCP server (auto-starts with Claude)
+npx claude-from-bed setup-mcp
+
+# Option B: Hooks + standalone server
+npx claude-from-bed setup    # Install hooks (one-time)
+npx claude-from-bed           # Start the bridge server
 ```
 
 ## What You Get
@@ -28,26 +36,33 @@ npx claude-from-bed
 
 **Push notifications** — Audio chime + browser notification when Claude hits an error or goes idle. Works even with the tab backgrounded.
 
-**Chat back** — Type a message on your phone. It gets delivered to Claude the next time it pauses, injected via the Stop hook. Claude continues working with your message as context.
+**Chat back** — Type a message on your phone. It gets delivered to Claude via the MCP `check_phone_messages` tool or the Stop hook. Claude continues working with your message as context.
 
 ## How It Works
 
-Claude Code has an [HTTP hooks system](https://docs.anthropic.com/en/docs/claude-code/hooks). The `setup` command installs hooks into `~/.claude/settings.json` that POST events to `localhost:3456` on every tool call, error, notification, and stop. The bridge server receives these, pushes them to your phone via WebSocket, and can inject messages back through the Stop hook.
+The bridge server runs on your LAN (port 3456) and serves a mobile web UI over WebSocket.
 
-All hooks are async (fire-and-forget) except the Stop hook, which is synchronous so it can block Claude from stopping when you have a pending message.
+**MCP mode** (recommended): The server registers as an MCP server that auto-starts with Claude. It exposes a `check_phone_messages` tool that Claude can call to receive your phone messages natively. Activity monitoring uses the JSONL conversation file watcher.
+
+**Hooks mode**: Claude Code's [HTTP hooks system](https://docs.anthropic.com/en/docs/claude-code/hooks) POSTs events to `localhost:3456` on every tool call, error, notification, and stop. The Stop hook is synchronous and can inject phone messages back into Claude.
+
+Both modes can be used together for the best experience.
 
 ## Commands
 
 ```bash
-npx claude-from-bed          # Start the bridge server
-npx claude-from-bed setup    # Install hooks into Claude Code
-npx claude-from-bed uninstall # Remove hooks from Claude Code
+npx claude-from-bed               # Start the bridge server standalone
+npx claude-from-bed setup-desktop  # Register MCP server for Claude Desktop
+npx claude-from-bed setup-mcp      # Register MCP server for Claude Code CLI
+npx claude-from-bed setup          # Install HTTP hooks for Claude Code CLI
+npx claude-from-bed uninstall      # Remove hooks from Claude Code
+npx claude-from-bed uninstall-desktop # Remove MCP server from Claude Desktop
 ```
 
 ## Requirements
 
 - Node.js 18+
-- Claude Code
+- Claude Code (Desktop or CLI)
 - Phone and computer on the same WiFi/LAN
 
 ## License

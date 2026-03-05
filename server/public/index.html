@@ -316,11 +316,24 @@ function playChime() {
 // ── WebSocket ──────────────────────────────────────────────────────────────────
 let ws;
 let reconnectTimer;
+let hooksActive = false;
 const feed = document.getElementById('feed');
 const statusDot = document.getElementById('statusDot');
 const statusText = document.getElementById('statusText');
 const toast = document.getElementById('toast');
 const queueStatus = document.getElementById('queueStatus');
+const msgInput = document.getElementById('msgInput');
+const sendBtn = document.getElementById('sendBtn');
+
+function updateChatState() {
+  msgInput.placeholder = 'Message Claude...';
+  msgInput.disabled = false;
+  sendBtn.disabled = false;
+  sendBtn.style.opacity = '1';
+  if (!hooksActive) {
+    queueStatus.textContent = '\uD83D\uDC41 Watching \u2014 messages delivered when Claude checks in';
+  }
+}
 
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -345,8 +358,13 @@ function connect() {
       const msg = JSON.parse(e.data);
       if (msg.type === 'init') {
         feed.innerHTML = '';
+        hooksActive = msg.hooksActive || false;
+        updateChatState();
         msg.events.forEach(evt => renderEvent(evt, false));
         scrollToBottom();
+      } else if (msg.type === 'hooks_active') {
+        hooksActive = true;
+        updateChatState();
       } else if (msg.type === 'event') {
         renderEvent(msg.event, true);
         if (msg.event.notify) {
@@ -519,9 +537,6 @@ document.addEventListener('click', () => {
 }, { once: false });
 
 // ── Chat ───────────────────────────────────────────────────────────────────────
-const msgInput = document.getElementById('msgInput');
-const sendBtn = document.getElementById('sendBtn');
-
 function sendMessage() {
   const text = msgInput.value.trim();
   if (!text || !ws || ws.readyState !== 1) return;
