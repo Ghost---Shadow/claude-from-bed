@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1117">
+<title>Claude From Bed</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface-hover: #1c2333;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+    --blue: #58a6ff;
+    --purple: #bc8cff;
+    --orange: #f0883e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Header ─────────────────────────────────────────── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--surface);
+  }
+  header h1 {
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--red);
+    transition: background 0.3s;
+  }
+  .status-dot.connected { background: var(--green); }
+  .status-dot.connected { animation: pulse 2s infinite; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* ── Events feed ────────────────────────────────────── */
+  #feed {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+  #feed:empty::after {
+    content: "Waiting for Claude Code events...";
+    display: block;
+    text-align: center;
+    color: var(--text-dim);
+    margin-top: 40vh;
+    font-size: 14px;
+  }
+
+  .event-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    border-left: 3px solid var(--border);
+    animation: slideIn 0.2s ease-out;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .event-card.tool_start { border-left-color: var(--yellow); }
+  .event-card.tool_end { border-left-color: var(--green); }
+  .event-card.tool_error { border-left-color: var(--red); background: #1a0f0f; }
+  .event-card.notification { border-left-color: var(--blue); background: #0d1a2d; }
+  .event-card.session_start { border-left-color: var(--purple); }
+  .event-card.claude_message { border-left-color: var(--text-dim); }
+  .event-card.claude_stopped { border-left-color: var(--orange); }
+  .event-card.phone_message { border-left-color: var(--text-dim); background: #111820; }
+  .event-card.phone_message_delivered { border-left-color: var(--green); background: #0d1a0d; }
+
+  .event-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+  .event-icon { font-size: 14px; }
+  .event-tool {
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .event-time {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .event-summary {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    word-break: break-all;
+    white-space: pre-wrap;
+    max-height: 60px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: max-height 0.3s ease;
+  }
+  .event-summary.expanded {
+    max-height: 2000px;
+  }
+  .event-result {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    max-height: 40px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: max-height 0.3s ease;
+  }
+  .event-result.expanded {
+    max-height: 2000px;
+  }
+
+  /* ── Chat input ─────────────────────────────────────── */
+  .chat-bar {
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    padding: 10px 12px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+  .chat-row {
+    display: flex;
+    gap: 8px;
+  }
+  #msgInput {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+    font-family: inherit;
+  }
+  #msgInput:focus { border-color: var(--blue); }
+  #msgInput::placeholder { color: var(--text-dim); }
+  #sendBtn {
+    background: var(--blue);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 18px;
+    width: 44px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  #sendBtn:active { opacity: 0.7; }
+  .queue-status {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    text-align: center;
+    min-height: 16px;
+  }
+
+  /* ── Notification toast ─────────────────────────────── */
+  .toast {
+    position: fixed;
+    top: 60px;
+    left: 12px;
+    right: 12px;
+    background: var(--blue);
+    color: #fff;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 100;
+    transform: translateY(-120%);
+    transition: transform 0.3s ease;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+  .toast.show { transform: translateY(0); }
+
+  /* ── Settings bar ───────────────────────────────────── */
+  .settings-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .settings-bar label {
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+  .settings-bar input[type="checkbox"] {
+    accent-color: var(--blue);
+  }
+  #clearBtn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  #clearBtn:active { background: var(--border); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Claude From Bed</h1>
+  <div class="status">
+    <span id="statusText">Connecting...</span>
+    <div class="status-dot" id="statusDot"></div>
+  </div>
+</header>
+
+<div class="settings-bar">
+  <label>
+    <input type="checkbox" id="soundToggle" checked>
+    Sound
+  </label>
+  <label>
+    <input type="checkbox" id="autoScroll" checked>
+    Auto-scroll
+  </label>
+  <button id="clearBtn">Clear</button>
+</div>
+
+<div id="feed"></div>
+
+<div class="toast" id="toast"></div>
+
+<div class="chat-bar">
+  <div class="chat-row">
+    <input type="text" id="msgInput" placeholder="Message Claude..." autocomplete="off">
+    <button id="sendBtn">&#x27A4;</button>
+  </div>
+  <div class="queue-status" id="queueStatus"></div>
+</div>
+
+<!-- notification chime (generated) -->
+<script>
+// ── Audio ──────────────────────────────────────────────────────────────────────
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+function playChime() {
+  if (!document.getElementById('soundToggle').checked) return;
+  try {
+    if (!audioCtx) audioCtx = new AudioCtx();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+    osc.frequency.setValueAtTime(1100, audioCtx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.4);
+  } catch(e) {}
+}
+
+// ── WebSocket ──────────────────────────────────────────────────────────────────
+let ws;
+let reconnectTimer;
+const feed = document.getElementById('feed');
+const statusDot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+const toast = document.getElementById('toast');
+const queueStatus = document.getElementById('queueStatus');
+
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}`);
+
+  ws.onopen = () => {
+    statusDot.classList.add('connected');
+    statusText.textContent = 'Live';
+    clearTimeout(reconnectTimer);
+  };
+
+  ws.onclose = () => {
+    statusDot.classList.remove('connected');
+    statusText.textContent = 'Reconnecting...';
+    reconnectTimer = setTimeout(connect, 2000);
+  };
+
+  ws.onerror = () => ws.close();
+
+  ws.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'init') {
+        feed.innerHTML = '';
+        msg.events.forEach(evt => renderEvent(evt, false));
+        scrollToBottom();
+      } else if (msg.type === 'event') {
+        renderEvent(msg.event, true);
+        if (msg.event.notify) {
+          showNotification(msg.event);
+        }
+        // Update message delivery status
+        if (msg.event.kind === 'phone_message_delivered') {
+          queueStatus.textContent = `Delivered ${msg.event.count} message(s)`;
+          setTimeout(() => { queueStatus.textContent = ''; }, 3000);
+        }
+      }
+    } catch(e) {}
+  };
+}
+
+// ── Rendering ──────────────────────────────────────────────────────────────────
+const ICONS = {
+  tool_start: '\u26A1',
+  tool_end: '\u2705',
+  tool_error: '\u274C',
+  notification: '\uD83D\uDD14',
+  session_start: '\uD83D\uDE80',
+  claude_message: '\uD83E\uDDE0',
+  claude_stopped: '\u23F8\uFE0F',
+  phone_message: '\uD83D\uDCF1',
+  phone_message_delivered: '\u2709\uFE0F'
+};
+
+const LABELS = {
+  tool_start: 'Running',
+  tool_end: 'Done',
+  tool_error: 'Failed',
+  notification: 'Notification',
+  session_start: 'Session',
+  claude_message: 'Claude',
+  claude_stopped: 'Paused',
+  phone_message: 'You',
+  phone_message_delivered: 'Delivered'
+};
+
+function formatTime(ts) {
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function renderEvent(evt, animate) {
+  const card = document.createElement('div');
+  card.className = `event-card ${evt.kind}`;
+  if (!animate) card.style.animation = 'none';
+
+  const icon = ICONS[evt.kind] || '\u2022';
+  const label = evt.tool_name || LABELS[evt.kind] || evt.kind;
+  const time = formatTime(evt.timestamp);
+
+  let body = '';
+
+  // Summary line
+  if (evt.summary) {
+    body += `<div class="event-summary" onclick="this.classList.toggle('expanded')">${escapeHtml(evt.summary)}</div>`;
+  }
+  if (evt.text) {
+    body += `<div class="event-summary" onclick="this.classList.toggle('expanded')">${escapeHtml(evt.text)}</div>`;
+  }
+  if (evt.message) {
+    body += `<div class="event-summary" onclick="this.classList.toggle('expanded')">${escapeHtml(evt.message)}</div>`;
+  }
+  if (evt.error) {
+    body += `<div class="event-summary" onclick="this.classList.toggle('expanded')" style="color:var(--red)">${escapeHtml(evt.error)}</div>`;
+  }
+
+  // Result (for tool_end)
+  if (evt.result) {
+    body += `<div class="event-result" onclick="this.classList.toggle('expanded')">${escapeHtml(evt.result)}</div>`;
+  }
+
+  // Source for session_start
+  if (evt.source) {
+    body += `<div class="event-summary">${escapeHtml(evt.source)}</div>`;
+  }
+
+  // Delivery count
+  if (evt.count) {
+    body += `<div class="event-summary" style="color:var(--green)">${evt.count} message(s) delivered to Claude</div>`;
+  }
+
+  card.innerHTML = `
+    <div class="event-header">
+      <span class="event-icon">${icon}</span>
+      <span class="event-tool">${escapeHtml(label)}</span>
+      <span class="event-time">${time}</span>
+    </div>
+    ${body}
+  `;
+
+  // For tool_end, try to update the matching tool_start card
+  if (evt.kind === 'tool_end' && evt.tool_use_id) {
+    const startCard = document.querySelector(`[data-tool-use-id="${evt.tool_use_id}"]`);
+    if (startCard) {
+      startCard.className = `event-card tool_end`;
+      startCard.querySelector('.event-icon').textContent = ICONS.tool_end;
+      startCard.querySelector('.event-tool').textContent = evt.tool_name || 'Done';
+      if (evt.result) {
+        const existing = startCard.querySelector('.event-result');
+        if (!existing) {
+          const resultDiv = document.createElement('div');
+          resultDiv.className = 'event-result';
+          resultDiv.onclick = function() { this.classList.toggle('expanded'); };
+          resultDiv.textContent = evt.result;
+          startCard.appendChild(resultDiv);
+        }
+      }
+      if (document.getElementById('autoScroll').checked) scrollToBottom();
+      return; // don't add a separate card
+    }
+  }
+
+  // Tag tool_start cards for matching later
+  if (evt.kind === 'tool_start' && evt.tool_use_id) {
+    card.setAttribute('data-tool-use-id', evt.tool_use_id);
+  }
+
+  feed.appendChild(card);
+  if (document.getElementById('autoScroll').checked) scrollToBottom();
+}
+
+function scrollToBottom() {
+  requestAnimationFrame(() => {
+    feed.scrollTop = feed.scrollHeight;
+  });
+}
+
+// ── Notifications ──────────────────────────────────────────────────────────────
+function showNotification(evt) {
+  // In-app toast
+  const label = evt.tool_name || LABELS[evt.kind] || evt.kind;
+  const text = evt.error || evt.message || evt.summary || label;
+  toast.textContent = `${ICONS[evt.kind] || ''} ${label}: ${text}`.substring(0, 100);
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 4000);
+
+  // Audio
+  playChime();
+
+  // Browser notification
+  if (Notification.permission === 'granted') {
+    try {
+      new Notification(`Claude: ${label}`, {
+        body: text.substring(0, 120),
+        tag: 'claude-from-bed',
+        renotify: true
+      });
+    } catch(e) {}
+  }
+}
+
+// Request notification permission on first interaction
+document.addEventListener('click', () => {
+  if (Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+  // Also init audio context on user gesture
+  if (!audioCtx) {
+    try { audioCtx = new AudioCtx(); } catch(e) {}
+  }
+}, { once: false });
+
+// ── Chat ───────────────────────────────────────────────────────────────────────
+const msgInput = document.getElementById('msgInput');
+const sendBtn = document.getElementById('sendBtn');
+
+function sendMessage() {
+  const text = msgInput.value.trim();
+  if (!text || !ws || ws.readyState !== 1) return;
+
+  ws.send(JSON.stringify({ type: 'message', text }));
+  msgInput.value = '';
+  queueStatus.textContent = '\u23F3 Will deliver when Claude pauses';
+}
+
+sendBtn.addEventListener('click', sendMessage);
+msgInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+// ── Clear ──────────────────────────────────────────────────────────────────────
+document.getElementById('clearBtn').addEventListener('click', () => {
+  feed.innerHTML = '';
+});
+
+// ── Keepalive ──────────────────────────────────────────────────────────────────
+setInterval(() => {
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: 'ping' }));
+  }
+}, 30000);
+
+// ── Start ──────────────────────────────────────────────────────────────────────
+connect();
+</script>
+</body>
+</html>
