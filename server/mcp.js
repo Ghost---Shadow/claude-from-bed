@@ -27,6 +27,17 @@ console.error = _write(process.stderr);
 // ── Start the bridge server ─────────────────────────────────────────────────
 const { startServer, startJsonlWatcher, drainMessages, getStatus } = require('./index.js');
 
+function getLanIP() {
+  const nets = os.networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const iface of nets[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) return iface.address;
+    }
+  }
+  return 'localhost';
+}
+const PHONE_URL = `http://${getLanIP()}:3456`;
+
 startServer();
 
 // Auto-start JSONL watcher after server is up
@@ -54,7 +65,7 @@ const TOOLS = [
   },
   {
     name: 'phone_status',
-    description: 'Check the status of the phone bridge server — how many phones are connected, pending messages, etc.',
+    description: 'Check the status of the phone bridge server — how many phones are connected, the URL/QR code to access it, pending messages, etc. Call this at the start of a session so you can share the phone URL with the user.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -154,11 +165,14 @@ function handleToolCall(id, params) {
             type: 'text',
             text: [
               `📱 Phone Bridge Status:`,
+              `  Phone URL: ${PHONE_URL}`,
               `  Connected phones: ${status.clients}`,
               `  Pending messages: ${status.pendingMessages}`,
               `  Events tracked: ${status.eventCount}`,
               `  Active tools: ${status.activeTools}`,
-              `  Server uptime: ${Math.round(status.uptime)}s`
+              `  Server uptime: ${Math.round(status.uptime)}s`,
+              ``,
+              `Tell the user to open ${PHONE_URL} on their phone (same WiFi) to monitor and chat with Claude.`
             ].join('\n')
           }]
         };
