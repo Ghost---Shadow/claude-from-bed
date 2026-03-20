@@ -255,6 +255,40 @@
     cursor: pointer;
   }
   #clearBtn:active { background: var(--border); }
+
+  /* ── Filter bar ──────────────────────────────────────── */
+  .filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .filter-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text-dim);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .filter-btn.active {
+    background: var(--surface-hover);
+    border-color: var(--blue);
+    color: var(--text);
+  }
+  .filter-btn:active { opacity: 0.7; }
 </style>
 </head>
 <body>
@@ -277,6 +311,18 @@
     Auto-scroll
   </label>
   <button id="clearBtn">Clear</button>
+</div>
+
+<div class="filter-bar" id="filterBar">
+  <button class="filter-btn active" data-filter="all">All</button>
+  <button class="filter-btn active" data-filter="tool_start">&#x26A1; Run</button>
+  <button class="filter-btn active" data-filter="tool_end">&#x2705; Done</button>
+  <button class="filter-btn active" data-filter="tool_error">&#x274C; Error</button>
+  <button class="filter-btn active" data-filter="notification">&#x1F514; Notify</button>
+  <button class="filter-btn active" data-filter="claude_message">&#x1F9E0; Claude</button>
+  <button class="filter-btn active" data-filter="claude_stopped">&#x23F8;&#xFE0F; Paused</button>
+  <button class="filter-btn active" data-filter="session_start">&#x1F680; Session</button>
+  <button class="filter-btn active" data-filter="phone_message">&#x1F4F1; Phone</button>
 </div>
 
 <div id="feed"></div>
@@ -491,6 +537,7 @@ function renderEvent(evt, animate) {
     card.setAttribute('data-tool-use-id', evt.tool_use_id);
   }
 
+  if (!activeFilters.has(evt.kind)) card.style.display = 'none';
   feed.appendChild(card);
   if (document.getElementById('autoScroll').checked) scrollToBottom();
 }
@@ -553,6 +600,55 @@ msgInput.addEventListener('keydown', (e) => {
     sendMessage();
   }
 });
+
+// ── Filters ─────────────────────────────────────────────────────────────────────
+const activeFilters = new Set([
+  'tool_start', 'tool_end', 'tool_error', 'notification',
+  'claude_message', 'claude_stopped', 'session_start',
+  'phone_message', 'phone_message_delivered'
+]);
+
+document.getElementById('filterBar').addEventListener('click', (e) => {
+  const btn = e.target.closest('.filter-btn');
+  if (!btn) return;
+  const filter = btn.dataset.filter;
+
+  if (filter === 'all') {
+    // If all are active, deactivate all. Otherwise activate all.
+    const allBtns = document.querySelectorAll('.filter-btn:not([data-filter="all"])');
+    const allActive = activeFilters.size >= allBtns.length;
+    allBtns.forEach(b => {
+      if (allActive) {
+        activeFilters.delete(b.dataset.filter);
+        b.classList.remove('active');
+      } else {
+        activeFilters.add(b.dataset.filter);
+        b.classList.add('active');
+      }
+    });
+    btn.classList.toggle('active', !allActive);
+  } else {
+    btn.classList.toggle('active');
+    if (activeFilters.has(filter)) {
+      activeFilters.delete(filter);
+    } else {
+      activeFilters.add(filter);
+    }
+    // Update "All" button state
+    const allBtns = document.querySelectorAll('.filter-btn:not([data-filter="all"])');
+    const allBtn = document.querySelector('[data-filter="all"]');
+    allBtn.classList.toggle('active', activeFilters.size >= allBtns.length);
+  }
+
+  applyFilters();
+});
+
+function applyFilters() {
+  document.querySelectorAll('.event-card').forEach(card => {
+    const kind = card.className.replace('event-card ', '').split(' ')[0];
+    card.style.display = activeFilters.has(kind) ? '' : 'none';
+  });
+}
 
 // ── Clear ──────────────────────────────────────────────────────────────────────
 document.getElementById('clearBtn').addEventListener('click', () => {
