@@ -9,72 +9,68 @@ Monitor and chat with Claude Code from your phone while lying in bed. Runs a loc
 └──────────────┘                  └────────────────┘               └─────────────┘
 ```
 
-## Quick Start (Claude Desktop)
+## Install
+
+### Claude Code CLI (recommended)
 
 ```bash
-# One-time setup — registers MCP server
-npx claude-from-bed setup-desktop
-
-# Restart Claude Desktop
-```
-
-That's it. On the next Claude session:
-
-1. Claude will tell you the phone URL (e.g. `http://192.168.x.x:3456`)
-2. Open that URL on your phone (same WiFi)
-3. You'll see a real-time feed of everything Claude does
-4. Type a message on your phone — Claude picks it up automatically
-
-## Quick Start (Claude Code CLI)
-
-```bash
-# Option A: MCP server (auto-starts with Claude)
 npx claude-from-bed setup-mcp
-
-# Option B: Hooks + standalone server
-npx claude-from-bed setup     # Install hooks (one-time)
-npx claude-from-bed            # Start the bridge server in another terminal
 ```
 
-## What You Get
+This registers an MCP server that auto-starts with every Claude Code session. No need to run a separate server — it just works.
 
-**Real-time activity feed** — Every tool call (Read, Edit, Bash, Grep, etc.) appears as a card on your phone the moment it happens.
+### Claude Desktop
 
-**Push notifications** — Audio chime + browser notification when Claude goes idle and is waiting for your response.
+```bash
+npx claude-from-bed setup-desktop
+```
 
-**Chat back from phone** — Type a message on your phone. Claude picks it up via a background long-poll listener and processes it as a user instruction. No need to walk back to your computer.
+Then restart Claude Desktop.
 
-## How It Works
+### Standalone (hooks mode)
 
-The MCP server auto-starts a bridge server on your LAN (port 3456) with each Claude session. On startup, it sends Claude instructions to:
+If you prefer hooks over MCP:
 
-1. **Tell you the phone URL** so you can connect
-2. **Poll for phone messages** at the start of every response
-3. **Run a background long-poll listener** that blocks until a phone message arrives, then wakes Claude up to process it
+```bash
+npx claude-from-bed setup     # Install hooks into ~/.claude/settings.json (one-time)
+npx claude-from-bed            # Start the bridge server (run in a separate terminal)
+```
 
-The phone UI connects via WebSocket for real-time push updates. Activity monitoring comes from watching Claude's JSONL conversation files and/or HTTP hooks.
+## Usage
+
+1. Start a Claude Code session
+2. Claude will tell you the phone URL (e.g. `http://192.168.x.x:3456`)
+3. Open that URL on your phone (same WiFi network)
+4. See everything Claude does in real time
+5. Send messages from your phone — Claude picks them up automatically
+
+## Features
+
+- **Real-time activity feed** — Every tool call appears as a card on your phone the moment it happens
+- **Push notifications** — Audio chime + browser notification when Claude needs attention
+- **Chat from phone** — Send follow-up instructions without walking to your computer
+- **Event filters** — Toggle event types on/off to focus on what matters
 
 ## Commands
 
-```bash
-npx claude-from-bed                  # Start the bridge server standalone
-npx claude-from-bed mcp              # Start as MCP server (used by Claude Desktop)
-npx claude-from-bed setup-desktop    # Register MCP server for Claude Desktop
-npx claude-from-bed setup-mcp        # Register MCP server for Claude Code CLI
-npx claude-from-bed setup            # Install HTTP hooks for Claude Code CLI
-npx claude-from-bed uninstall        # Remove hooks from Claude Code
-npx claude-from-bed uninstall-desktop # Remove MCP server from Claude Desktop
-```
+| Command | Description |
+|---------|-------------|
+| `npx claude-from-bed` | Start bridge server standalone |
+| `npx claude-from-bed setup-mcp` | Register MCP server for Claude Code CLI |
+| `npx claude-from-bed setup-desktop` | Register MCP server for Claude Desktop |
+| `npx claude-from-bed setup` | Install HTTP hooks for Claude Code CLI |
+| `npx claude-from-bed uninstall` | Remove hooks from Claude Code |
+| `npx claude-from-bed uninstall-desktop` | Remove MCP server from Claude Desktop |
 
 ## Uninstall
 
 ```bash
-# Claude Desktop
-npx claude-from-bed uninstall-desktop
-# Restart Claude Desktop
-
 # Claude Code CLI
 npx claude-from-bed uninstall
+
+# Claude Desktop
+npx claude-from-bed uninstall-desktop
+# Then restart Claude Desktop
 ```
 
 ## Requirements
